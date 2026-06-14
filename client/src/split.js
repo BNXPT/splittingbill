@@ -1,6 +1,4 @@
-// การคำนวณหารเงิน — ใช้หน่วย "สตางค์" (จำนวนเต็ม) เพื่อความแม่นยำ ไม่มี error จากทศนิยม
-// (เวอร์ชัน frontend — ทำงานในเบราว์เซอร์ ไม่ต้องมี server)
-
+// การคำนวณหารเงิน — ใช้หน่วย "สตางค์" (จำนวนเต็ม) เพื่อความแม่นยำ
 export const toSatang = (baht) => Math.round(Number(baht) * 100);
 export const toBaht = (satang) => satang / 100;
 
@@ -12,6 +10,18 @@ export function splitEqual(amountSatang, participantIds) {
   const remainder = amountSatang - base * n;
   for (let i = 0; i < n; i++) shares[participantIds[i]] = base + (i < remainder ? 1 : 0);
   return shares;
+}
+
+// แบ่งจำนวนเต็ม total ลงในถังตามสัดส่วน weights แบบเป๊ะ (ผลรวม = total เสมอ)
+function allocate(total, weights) {
+  const W = weights.reduce((a, b) => a + b, 0);
+  if (W === 0) return weights.map(() => 0);
+  const raw = weights.map((w) => (total * w) / W);
+  const out = raw.map(Math.floor);
+  const rem = total - out.reduce((a, b) => a + b, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0]);
+  for (let i = 0; i < rem; i++) out[order[i][1]]++;
+  return out;
 }
 
 export function computeBalances(people, expenses) {
@@ -32,31 +42,40 @@ export function computeBalances(people, expenses) {
   return net;
 }
 
-export function settle(net) {
-  const debtors = [];
-  const creditors = [];
-  for (const [id, v] of Object.entries(net)) {
-    if (v < 0) debtors.push({ id, amount: -v });
-    else if (v > 0) creditors.push({ id, amount: v });
+// คืนเงินให้ทุกคนที่ออกไปก่อน ตามแต่ละรายการ แล้วหักลบรายคู่
+export function settle(people, expenses) {
+  const owe = {};
+  const add = (from, to, sat) => {
+    if (from === to || sat === 0) return;
+    const k = from + '|' + to;
+    owe[k] = (owe[k] || 0) + sat;
+  };
+  for (const e of expenses) {
+    const shares = splitEqual(toSatang(e.amount), e.participants);
+    const payerWeights = e.payers.map((p) => toSatang(p.paid));
+    for (const pid of e.participants) {
+      const parts = allocate(shares[pid], payerWeights);
+      e.payers.forEach((payer, idx) => add(pid, payer.personId, parts[idx]));
+    }
   }
-  debtors.sort((a, b) => b.amount - a.amount);
-  creditors.sort((a, b) => b.amount - a.amount);
-  const transactions = [];
-  let i = 0, j = 0;
-  while (i < debtors.length && j < creditors.length) {
-    const pay = Math.min(debtors[i].amount, creditors[j].amount);
-    if (pay > 0) transactions.push({ from: debtors[i].id, to: creditors[j].id, amount: toBaht(pay) });
-    debtors[i].amount -= pay;
-    creditors[j].amount -= pay;
-    if (debtors[i].amount === 0) i++;
-    if (creditors[j].amount === 0) j++;
+  const seen = new Set();
+  const tx = [];
+  for (const key of Object.keys(owe)) {
+    const [a, b] = key.split('|');
+    const back = b + '|' + a;
+    if (seen.has(back)) continue;
+    seen.add(key);
+    const net = (owe[key] || 0) - (owe[back] || 0);
+    if (net > 0) tx.push({ from: a, to: b, amount: toBaht(net) });
+    else if (net < 0) tx.push({ from: b, to: a, amount: toBaht(-net) });
   }
-  return transactions;
+  tx.sort((x, y) => y.amount - x.amount);
+  return tx;
 }
 
 export function summarize(people, expenses) {
   const net = computeBalances(people, expenses);
   const balances = Object.fromEntries(Object.entries(net).map(([id, s]) => [id, toBaht(s)]));
   const total = expenses.reduce((sum, e) => sum + toSatang(e.amount), 0);
-  return { totalSpent: toBaht(total), balances, transactions: settle(net) };
+  return { totalSpent: toBaht(total), balances, transactions: settle(people, expenses) };
 }

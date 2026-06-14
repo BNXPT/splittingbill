@@ -18,7 +18,7 @@ export default function App() {
     <div className="app">
       <header className="hero">
         <h1>🍻 หารค่าเหล้า / ค่าอาหาร</h1>
-        <p>หารเท่ากันทุกคน · คำนวณแม่นยำระดับสตางค์ · เก็บข้อมูลในเครื่องคุณ</p>
+        <p>หารเท่ากันทุกคน · คำนวณแม่นยำระดับสตางค์</p>
       </header>
 
       <div className="grid">
