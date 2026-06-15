@@ -203,3 +203,13 @@ button:active { transform: translateY(1px); }
 /* เน้นชื่อคนที่ออกบิลย่อย */
 .exp-payer { font-weight: 800; font-size: 1.1rem; color: var(--blue-900); }
 .exp-sub { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
+
+/* popup ฟอร์มเพิ่มบิลย่อย */
+.form-modal { width: min(94vw, 470px); text-align: left; max-height: 86vh; overflow-y: auto; padding: 22px 22px 20px; }
+.form-modal-head { display: flex; justify-content: space-between; align-items: center; }
+.form-modal-head h2 { margin: 0; }
+.close-x { background: transparent; color: var(--muted); font-size: 1.7rem; line-height: 1; padding: 0 6px; }
+.close-x:hover { color: var(--ink); }
+.add-sub-btn { display: block; width: 100%; margin: 0 0 18px; font-size: 1.05rem; padding: 14px; }
+.add-sub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hint { text-align: center; margin: -10px 0 18px; }

@@ -99,23 +99,36 @@ function BillDetail({ bill, onBack }) {
   const [people, setPeople] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+
   const reload = async () => {
-    const [pe, ex, su] = await Promise.all([api.getPeople(bill.id), api.getExpenses(bill.id), api.getSummary(bill.id)]);
+    const [pe, ex, su] = await Promise.all([
+      api.getPeople(bill.id), api.getExpenses(bill.id), api.getSummary(bill.id),
+    ]);
     setPeople(pe); setExpenses(ex); setSummary(su);
   };
   useEffect(() => { reload(); }, [bill.id]);
+
   return (
     <>
       <div className="bill-head">
         <button className="back" onClick={onBack}>← บิลทั้งหมด</button>
         <h2 className="current-bill">{bill.name}</h2>
       </div>
-      <div className="grid">
-        <PeoplePanel billId={bill.id} people={people} onChange={reload} />
-        <ExpenseForm billId={bill.id} people={people} onChange={reload} />
-      </div>
+
+      <PeoplePanel billId={bill.id} people={people} onChange={reload} />
+
+      <button className="primary wide add-sub-btn" onClick={() => setShowForm(true)} disabled={people.length < 1}>
+        ➕ เพิ่มบิลย่อย
+      </button>
+      {people.length < 1 && <p className="muted hint">เพิ่มชื่อคนก่อน แล้วค่อยเพิ่มบิลย่อย</p>}
+
       <ExpenseList billId={bill.id} expenses={expenses} onChange={reload} />
       <Summary summary={summary} />
+
+      {showForm && (
+        <ExpenseForm billId={bill.id} people={people} onChange={reload} onClose={() => setShowForm(false)} />
+      )}
     </>
   );
 }
@@ -165,15 +178,17 @@ function PeoplePanel({ billId, people, onChange }) {
   );
 }
 
-function ExpenseForm({ billId, people, onChange }) {
+function ExpenseForm({ billId, people, onChange, onClose }) {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [payers, setPayers] = useState({});
   const [participants, setParticipants] = useState({});
   const [error, setError] = useState('');
+
   useEffect(() => {
     setParticipants((prev) => { const next = {}; people.forEach((p) => { next[p.id] = prev[p.id] ?? true; }); return next; });
   }, [people]);
+
   const togglePayer = (id) => setPayers((prev) => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ''; return next; });
   const toggleParticipant = (id) => setParticipants((prev) => ({ ...prev, [id]: !prev[id] }));
   const autoFillPayers = () => {
@@ -185,6 +200,7 @@ function ExpenseForm({ billId, people, onChange }) {
   };
   const partIds = people.filter((p) => participants[p.id]).map((p) => p.id);
   const perHead = partIds.length && amount ? Number(amount) / partIds.length : 0;
+
   const submit = async () => {
     setError(''); const amt = Number(amount);
     if (!description.trim()) return setError('ใส่รายละเอียด เช่น “ค่าเหล้า”');
@@ -196,19 +212,25 @@ function ExpenseForm({ billId, people, onChange }) {
     if (Math.round(sumPaid * 100) !== Math.round(amt * 100)) return setError(`ยอดที่ออกรวมกัน (${baht(sumPaid)}) ต้องเท่ากับยอดรวม (${baht(amt)})`);
     if (!partIds.length) return setError('เลือกคนที่ร่วมหารอย่างน้อย 1 คน');
     await api.addExpense(billId, { description: description.trim(), amount: amt, payers: payerList, participants: partIds });
-    setDescription(''); setAmount(''); setPayers({}); onChange();
+    setDescription(''); setAmount(''); setPayers({});
+    onChange();
+    onClose();
   };
+
   return (
-    <section className="card">
-      <h2>🧾 เพิ่มบิลย่อย</h2>
-      {people.length < 1 ? (
-        <p className="muted">เพิ่มชื่อคนก่อน แล้วค่อยเพิ่มบิลย่อย</p>
-      ) : (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card form-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="form-modal-head">
+          <h2>🧾 เพิ่มบิลย่อย</h2>
+          <button className="close-x" onClick={onClose}>×</button>
+        </div>
         <>
           <label>รายละเอียด</label>
           <input value={description} placeholder="ค่าเหล้า / ค่าอาหาร…" onChange={(e) => setDescription(e.target.value)} />
+
           <label>จำนวนเงินรวม (บาท)</label>
           <input type="number" min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e) => setAmount(e.target.value)} />
+
           <div className="block-head">
             <label>ใครออกเงินให้ก่อน? <span className="muted">({Object.keys(payers).length} คน)</span></label>
             {Object.keys(payers).length > 1 && <button type="button" className="link" onClick={autoFillPayers}>หารยอดออกเท่ากัน</button>}
@@ -225,18 +247,20 @@ function ExpenseForm({ billId, people, onChange }) {
               );
             })}
           </div>
+
           <label>ใครร่วมหารบ้าง? (หารเท่ากัน)</label>
           <div className="chips select">
             {people.map((p) => (
               <button key={p.id} type="button" className={'chip toggle' + (participants[p.id] ? ' active' : '')} onClick={() => toggleParticipant(p.id)}>{p.name}</button>
             ))}
           </div>
+
           {perHead > 0 && <p className="preview">ตกคนละ <b>{baht(perHead)}</b> ({partIds.length} คน)</p>}
           {error && <p className="error">{error}</p>}
           <button className="primary wide" onClick={submit}>บันทึกบิลย่อย</button>
         </>
-      )}
-    </section>
+      </div>
+    </div>
   );
 }
 
