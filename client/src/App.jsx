@@ -294,33 +294,70 @@ function ExpenseList({ billId, expenses, onChange }) {
   );
 }
 
+const initial = (name) => (name || '?').trim().charAt(0);
+
 function Summary({ summary }) {
   if (!summary || (!summary.transactions.length && !summary.balances.length)) return null;
+
+  // จัดกลุ่มการโอนตาม "คนที่ต้องจ่าย"
+  const byPayer = {};
+  for (const t of summary.transactions) (byPayer[t.from] ??= []).push(t);
+  const payers = Object.keys(byPayer);
+
+  // เรียงยอดสุทธิ: ได้คืนก่อน แล้วค่อยจ่ายเพิ่ม
+  const balances = [...summary.balances].sort((a, b) => b.net - a.net);
+
   return (
     <section className="card summary">
       <h2>💰 สรุปผล</h2>
       <p className="total">ยอดใช้จ่ายรวม: <b>{baht(summary.totalSpent)}</b></p>
+
       <h3>ใครต้องจ่ายให้ใคร</h3>
-      {summary.transactions.length === 0 ? (
+      {payers.length === 0 ? (
         <p className="muted">ทุกคนเคลียร์กันหมดแล้ว 🎉</p>
       ) : (
-        <ul className="settle">
-          {summary.transactions.map((t, i) => (
-            <li key={i}>
-              <span className="from">{t.from}</span><span className="arrow">→ จ่าย →</span>
-              <span className="to">{t.to}</span><span className="pay">{baht(t.amount)}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="settle-groups">
+          {payers.map((name) => {
+            const items = byPayer[name];
+            const sum = items.reduce((s, t) => s + t.amount, 0);
+            return (
+              <div className="settle-group" key={name}>
+                <div className="sg-head">
+                  <span className="avatar red">{initial(name)}</span>
+                  <span className="sg-name">{name}</span>
+                  <span className="sg-total">จ่ายรวม {baht(sum)}</span>
+                </div>
+                <ul className="sg-list">
+                  {items.map((t, i) => (
+                    <li key={i}>
+                      <span className="sg-arrow">จ่ายให้</span>
+                      <b>{t.to}</b>
+                      <span className="sg-amt">{baht(t.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
       )}
+
       <h3>ยอดสุทธิแต่ละคน</h3>
       <ul className="balances">
-        {summary.balances.map((b) => (
-          <li key={b.personId} className={b.net > 0.005 ? 'plus' : b.net < -0.005 ? 'minus' : 'zero'}>
-            <span>{b.name}</span>
-            <span>{b.net > 0.005 ? 'ควรได้คืน ' : b.net < -0.005 ? 'ต้องจ่ายเพิ่ม ' : 'เท่าทุน '}{baht(Math.abs(b.net))}</span>
-          </li>
-        ))}
+        {balances.map((b) => {
+          const cls = b.net > 0.005 ? 'plus' : b.net < -0.005 ? 'minus' : 'zero';
+          return (
+            <li key={b.personId} className={cls}>
+              <span className="bal-name">
+                <span className={'avatar ' + (cls === 'plus' ? 'green' : cls === 'minus' ? 'red' : 'gray')}>{initial(b.name)}</span>
+                {b.name}
+              </span>
+              <span className="bal-val">
+                {b.net > 0.005 ? 'ควรได้คืน ' : b.net < -0.005 ? 'ต้องจ่ายเพิ่ม ' : 'เท่าทุน '}{baht(Math.abs(b.net))}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

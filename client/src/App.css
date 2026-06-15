@@ -117,22 +117,36 @@ button:active { transform: translateY(1px); }
 
 /* summary */
 .summary .total { font-size: 1.05rem; }
-.settle { list-style: none; padding: 0; margin: 0; }
-.settle li {
-  display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 10px;
-  background: var(--blue-50); border: 1px solid #e0eefb;
-  padding: 12px 14px; border-radius: 12px; margin-bottom: 8px;
+
+/* avatar ตัวอักษรย่อ */
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 0.9rem; text-transform: uppercase;
 }
-.settle .from { font-weight: 700; color: var(--red); }
-.settle .to { font-weight: 700; color: var(--green); text-align: right; }
-.settle .arrow { font-size: 0.8rem; color: var(--muted); }
-.settle .pay { font-weight: 800; color: var(--blue-700); font-size: 1.05rem; }
+.avatar.red { background: var(--red); }
+.avatar.green { background: var(--green); }
+.avatar.gray { background: var(--muted); }
+
+/* การโอน จัดกลุ่มตามคนที่ต้องจ่าย */
+.settle-groups { display: flex; flex-direction: column; gap: 12px; }
+.settle-group { background: var(--blue-50); border: 1px solid #e0eefb; border-radius: 14px; padding: 12px 14px; }
+.sg-head { display: flex; align-items: center; gap: 10px; }
+.sg-name { font-weight: 800; color: var(--ink); font-size: 1.05rem; }
+.sg-total { margin-left: auto; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.sg-list { list-style: none; padding: 0; margin: 10px 0 0 40px; display: flex; flex-direction: column; gap: 6px; }
+.sg-list li { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-radius: 10px; }
+.sg-arrow { font-size: 0.82rem; color: var(--muted); }
+.sg-list li b { color: var(--green); }
+.sg-amt { margin-left: auto; font-weight: 800; color: var(--blue-700); }
 
 .balances { list-style: none; padding: 0; margin: 0; }
-.balances li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 8px; }
-.balances li.plus { color: var(--green); }
-.balances li.minus { color: var(--red); }
-.balances li.zero { color: var(--muted); }
+.balances li { display: flex; justify-content: space-between; align-items: center; padding: 8px 6px; border-radius: 8px; }
+.bal-name { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; }
+.bal-val { font-weight: 700; }
+.balances li.plus .bal-val { color: var(--green); }
+.balances li.minus .bal-val { color: var(--red); }
+.balances li.zero .bal-val { color: var(--muted); }
 
 /* รายการบิลใหญ่ */
 .bill-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 10px; }
