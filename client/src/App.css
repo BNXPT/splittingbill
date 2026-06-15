@@ -133,3 +133,73 @@ button:active { transform: translateY(1px); }
 .balances li.plus { color: var(--green); }
 .balances li.minus { color: var(--red); }
 .balances li.zero { color: var(--muted); }
+
+/* รายการบิลใหญ่ */
+.bill-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.bill-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; border-radius: 12px; cursor: pointer;
+  background: var(--blue-50); border: 1.5px solid #e0eefb; transition: border-color .15s, transform .08s;
+}
+.bill-item:hover { border-color: var(--blue-500); }
+.bill-item:active { transform: scale(0.995); }
+.bill-name { font-weight: 700; font-size: 1.05rem; color: var(--blue-900); }
+.bill-date { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.bill-actions { display: flex; align-items: center; gap: 12px; }
+.bill-actions .open { color: var(--blue-600); font-weight: 700; font-size: 0.9rem; }
+.bill-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.back { background: #fff; color: var(--blue-700); border: 1.5px solid #d7e6f7; padding: 8px 14px; border-radius: 10px; font-weight: 600; }
+.back:hover { background: var(--blue-50); }
+.current-bill { margin: 0; color: var(--blue-900); font-size: 1.3rem; }
+
+.row2 { display: flex; gap: 8px; margin-top: 8px; }
+.row2 input { flex: 1; }
+.row2 .amt { flex: 0 0 130px; }
+
+/* popup ยืนยันลบ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(12, 35, 64, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+.modal-card {
+  background: #fff; border-radius: 20px; padding: 30px 26px 22px;
+  width: min(90vw, 360px); text-align: center;
+  box-shadow: 0 24px 60px rgba(12, 35, 64, 0.35);
+  animation: pop 0.18s ease;
+}
+.modal-icon {
+  width: 66px; height: 66px; margin: 0 auto 16px; border-radius: 50%;
+  background: var(--blue-100); color: var(--blue-600);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.4rem; font-weight: 800;
+}
+.modal-msg { font-size: 1.08rem; color: var(--ink); font-weight: 600; margin: 0 0 24px; }
+.modal-actions { display: flex; gap: 12px; }
+.modal-actions button { flex: 1; padding: 12px; font-size: 1rem; font-weight: 700; border-radius: 12px; color: #fff; }
+.btn-confirm { background: var(--green); box-shadow: 0 4px 12px rgba(46, 158, 106, 0.35); }
+.btn-cancel { background: var(--red); box-shadow: 0 4px 12px rgba(214, 69, 69, 0.3); }
+.btn-confirm:hover, .btn-cancel:hover { filter: brightness(0.95); }
+
+/* แจ้งเตือน (toast) */
+.toast {
+  position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%);
+  z-index: 1100; background: var(--blue-900); color: #fff;
+  padding: 12px 24px; border-radius: 999px; font-weight: 700;
+  box-shadow: 0 12px 32px rgba(12, 35, 64, 0.3);
+  animation: toastIn 0.2s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes toastIn { from { transform: translate(-50%, 14px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* หัวบิลย่อย + ยอดรวม */
+.exp-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.exp-head h2 { margin: 0; }
+.exp-total { background: var(--blue-100); color: var(--blue-900); font-size: 0.95rem; padding: 6px 16px; border-radius: 999px; font-weight: 600; }
+.exp-total b { color: var(--blue-700); }
+/* เน้นชื่อคนที่ออกบิลย่อย */
+.exp-payer { font-weight: 800; font-size: 1.1rem; color: var(--blue-900); }
+.exp-sub { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }

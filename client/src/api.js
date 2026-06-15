@@ -1,74 +1,71 @@
-// เก็บข้อมูลในเบราว์เซอร์ (localStorage) — ต่างคน/ต่างเครื่อง ข้อมูลแยกกัน ไม่แชร์
-// ไม่ต้องมี backend/ฐานข้อมูลกลาง  (เก็บใน "เครื่องของ user" ตามที่ตั้งใจไว้)
+// เก็บข้อมูลในเบราว์เซอร์ (localStorage) — บิลใหญ่หลายบิล แต่ละบิลมีคน+บิลย่อยของตัวเอง
 import { summarize } from './split.js';
 
-const PKEY = 'billsplit:people';
-const EKEY = 'billsplit:expenses';
-const SKEY = 'billsplit:seq';
-
-const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-let seq = load(SKEY, 0);
-const nextId = () => { seq += 1; save(SKEY, seq); return seq; };
+const KEY = 'billsplit:data';
+const blank = () => ({ seq: 0, bills: [], people: {}, expenses: {} });
+const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? blank(); } catch { return blank(); } };
+const write = (d) => localStorage.setItem(KEY, JSON.stringify(d));
+const nextId = (d) => { d.seq += 1; return d.seq; };
 
 export const api = {
-  async getPeople() {
-    return load(PKEY, []);
+  async getBills() { return read().bills.slice().reverse(); },
+  async addBill(name) {
+    const d = read();
+    const bill = { id: nextId(d), name, created_at: new Date().toLocaleString('th-TH') };
+    d.bills.push(bill); d.people[bill.id] = []; d.expenses[bill.id] = [];
+    write(d); return bill;
   },
-  async addPerson(name) {
-    const people = load(PKEY, []);
-    const p = { id: nextId(), name };
-    people.push(p);
-    save(PKEY, people);
-    return p;
-  },
-  async deletePerson(id) {
-    id = Number(id);
-    save(PKEY, load(PKEY, []).filter((p) => p.id !== id));
-    // เอาคนนี้ออกจากทุกรายการด้วย และทิ้งรายการที่ไม่มีคนออก/คนหารเหลือ
-    const expenses = load(EKEY, [])
-      .map((e) => ({
-        ...e,
-        payers: e.payers.filter((x) => x.person_id !== id),
-        participants: e.participants.filter((x) => x.person_id !== id),
-      }))
-      .filter((e) => e.payers.length && e.participants.length);
-    save(EKEY, expenses);
-    return { ok: true };
+  async deleteBill(billId) {
+    const d = read(); billId = Number(billId);
+    d.bills = d.bills.filter((b) => b.id !== billId);
+    delete d.people[billId]; delete d.expenses[billId];
+    write(d); return { ok: true };
   },
 
-  async getExpenses() {
-    return load(EKEY, []).slice().reverse(); // รายการล่าสุดอยู่บนสุด
+  async getPeople(billId) { return read().people[billId] ?? []; },
+  async addPerson(billId, name) {
+    const d = read();
+    const p = { id: nextId(d), name };
+    (d.people[billId] ??= []).push(p);
+    write(d); return p;
   },
-  async addExpense({ description, amount, payers, participants }) {
-    const people = load(PKEY, []);
-    const nameOf = Object.fromEntries(people.map((p) => [p.id, p.name]));
-    const expenses = load(EKEY, []);
+  async deletePerson(billId, id) {
+    const d = read(); id = Number(id);
+    d.people[billId] = (d.people[billId] ?? []).filter((p) => p.id !== id);
+    d.expenses[billId] = (d.expenses[billId] ?? [])
+      .map((e) => ({ ...e, payers: e.payers.filter((x) => x.person_id !== id), participants: e.participants.filter((x) => x.person_id !== id) }))
+      .filter((e) => e.payers.length && (e.allMembers || e.participants.length));
+    write(d); return { ok: true };
+  },
+
+  async getExpenses(billId) { return (read().expenses[billId] ?? []).slice().reverse(); },
+  async addExpense(billId, { description, amount, payers, participants, allMembers }) {
+    const d = read();
+    const nameOf = Object.fromEntries((d.people[billId] ?? []).map((p) => [p.id, p.name]));
     const e = {
-      id: nextId(),
-      description,
-      amount: Number(amount),
+      id: nextId(d), description, amount: Number(amount),
       created_at: new Date().toLocaleString('th-TH'),
       payers: payers.map((p) => ({ person_id: Number(p.personId), paid: Number(p.paid), name: nameOf[p.personId] })),
-      participants: participants.map((pid) => ({ person_id: Number(pid), name: nameOf[pid] })),
+      allMembers: !!allMembers, // true = หารทุกคนในบิล (คนที่เพิ่มทีหลังก็หารด้วย)
+      participants: allMembers ? [] : (participants ?? []).map((pid) => ({ person_id: Number(pid), name: nameOf[pid] })),
     };
-    expenses.push(e);
-    save(EKEY, expenses);
-    return e;
+    (d.expenses[billId] ??= []).push(e);
+    write(d); return e;
   },
-  async deleteExpense(id) {
-    id = Number(id);
-    save(EKEY, load(EKEY, []).filter((e) => e.id !== id));
-    return { ok: true };
+  async deleteExpense(billId, id) {
+    const d = read(); id = Number(id);
+    d.expenses[billId] = (d.expenses[billId] ?? []).filter((e) => e.id !== id);
+    write(d); return { ok: true };
   },
 
-  async getSummary() {
-    const people = load(PKEY, []);
-    const expenses = load(EKEY, []).map((e) => ({
+  async getSummary(billId) {
+    const d = read();
+    const people = d.people[billId] ?? [];
+    const allIds = people.map((p) => p.id);
+    const expenses = (d.expenses[billId] ?? []).map((e) => ({
       amount: e.amount,
       payers: e.payers.map((p) => ({ personId: p.person_id, paid: p.paid })),
-      participants: e.participants.map((p) => p.person_id),
+      participants: e.allMembers ? allIds : e.participants.map((p) => p.person_id),
     }));
     const result = summarize(people, expenses);
     const nameOf = Object.fromEntries(people.map((p) => [p.id, p.name]));
