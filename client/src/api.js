@@ -1,79 +1,78 @@
-// เรียก REST API ของ backend (Express + PostgreSQL) พร้อมแนบ token ทุกครั้ง
-// ข้อมูลทั้งหมดเก็บที่ฐานข้อมูลบนเซิร์ฟเวอร์ ไม่ได้อยู่ในเบราว์เซอร์แล้ว
-const BASE = import.meta.env.VITE_API_URL || ''; // ว่าง = ใช้ proxy /api ของ vite (dev) หรือ origin เดียวกัน (prod)
-const TOKEN_KEY = 'billsplit:token';
-const USER_KEY = 'billsplit:user';
+// เก็บข้อมูลในเบราว์เซอร์ (localStorage) — บิลใหญ่หลายบิล แต่ละบิลมีคน+บิลย่อยของตัวเอง
+import { summarize } from './split.js';
 
-const getToken = () => localStorage.getItem(TOKEN_KEY);
-const getUser = () => { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } };
-const setSession = (token, user) => {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-};
-const clearSession = () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); };
-
-// ตัวช่วยยิง request: แนบ Authorization, แปลง JSON, และโยน error พร้อมข้อความจากเซิร์ฟเวอร์
-async function request(path, { method = 'GET', body } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await fetch(`${BASE}/api${path}`, {
-    method, headers, body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (res.status === 401) {
-    // token หมดอายุ/ไม่ถูกต้อง — เคลียร์เซสชันแล้วบอก App ให้กลับไปหน้า login
-    clearSession();
-    window.dispatchEvent(new Event('auth-expired'));
-  }
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
-  return data;
-}
-
-const fmtDate = (iso) => {
-  try { return new Date(iso).toLocaleString('th-TH'); } catch { return iso; }
-};
+const KEY = 'billsplit:data';
+const blank = () => ({ seq: 0, bills: [], people: {}, expenses: {} });
+const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? blank(); } catch { return blank(); } };
+const write = (d) => localStorage.setItem(KEY, JSON.stringify(d));
+const nextId = (d) => { d.seq += 1; return d.seq; };
 
 export const api = {
-  // ----- สถานะการล็อกอิน -----
-  getUser,
-  isAuthed: () => !!getToken(),
-  logout: () => { clearSession(); },
-
-  // ----- Auth -----
-  async register(username, password) {
-    const { token, user } = await request('/auth/register', { method: 'POST', body: { username, password } });
-    setSession(token, user); return user;
-  },
-  async login(username, password) {
-    const { token, user } = await request('/auth/login', { method: 'POST', body: { username, password } });
-    setSession(token, user); return user;
-  },
-
-  // ----- บิล -----
-  async getBills() {
-    const bills = await request('/bills');
-    return bills.map((b) => ({ ...b, created_at: fmtDate(b.created_at) }));
-  },
+  async getBills() { return read().bills.slice().reverse(); },
   async addBill(name) {
-    const b = await request('/bills', { method: 'POST', body: { name } });
-    return { ...b, created_at: fmtDate(b.created_at) };
+    const d = read();
+    const bill = { id: nextId(d), name, created_at: new Date().toLocaleString('th-TH') };
+    d.bills.push(bill); d.people[bill.id] = []; d.expenses[bill.id] = [];
+    write(d); return bill;
   },
-  async deleteBill(billId) { return request(`/bills/${billId}`, { method: 'DELETE' }); },
+  async deleteBill(billId) {
+    const d = read(); billId = Number(billId);
+    d.bills = d.bills.filter((b) => b.id !== billId);
+    delete d.people[billId]; delete d.expenses[billId];
+    write(d); return { ok: true };
+  },
 
-  // ----- คนในบิล -----
-  async getPeople(billId) { return request(`/bills/${billId}/people`); },
-  async addPerson(billId, name) { return request(`/bills/${billId}/people`, { method: 'POST', body: { name } }); },
-  async deletePerson(billId, id) { return request(`/bills/${billId}/people/${id}`, { method: 'DELETE' }); },
+  async getPeople(billId) { return read().people[billId] ?? []; },
+  async addPerson(billId, name) {
+    const d = read();
+    const p = { id: nextId(d), name };
+    (d.people[billId] ??= []).push(p);
+    write(d); return p;
+  },
+  async deletePerson(billId, id) {
+    const d = read(); id = Number(id);
+    d.people[billId] = (d.people[billId] ?? []).filter((p) => p.id !== id);
+    d.expenses[billId] = (d.expenses[billId] ?? [])
+      .map((e) => ({ ...e, payers: e.payers.filter((x) => x.person_id !== id), participants: e.participants.filter((x) => x.person_id !== id) }))
+      .filter((e) => e.payers.length && (e.allMembers || e.participants.length));
+    write(d); return { ok: true };
+  },
 
-  // ----- รายจ่าย (บิลย่อย) -----
-  async getExpenses(billId) { return request(`/bills/${billId}/expenses`); },
-  async addExpense(billId, payload) { return request(`/bills/${billId}/expenses`, { method: 'POST', body: payload }); },
-  async deleteExpense(billId, id) { return request(`/bills/${billId}/expenses/${id}`, { method: 'DELETE' }); },
+  async getExpenses(billId) { return (read().expenses[billId] ?? []).slice().reverse(); },
+  async addExpense(billId, { description, amount, payers, participants, allMembers }) {
+    const d = read();
+    const nameOf = Object.fromEntries((d.people[billId] ?? []).map((p) => [p.id, p.name]));
+    const e = {
+      id: nextId(d), description, amount: Number(amount),
+      created_at: new Date().toLocaleString('th-TH'),
+      payers: payers.map((p) => ({ person_id: Number(p.personId), paid: Number(p.paid), name: nameOf[p.personId] })),
+      allMembers: !!allMembers, // true = หารทุกคนในบิล (คนที่เพิ่มทีหลังก็หารด้วย)
+      participants: allMembers ? [] : (participants ?? []).map((pid) => ({ person_id: Number(pid), name: nameOf[pid] })),
+    };
+    (d.expenses[billId] ??= []).push(e);
+    write(d); return e;
+  },
+  async deleteExpense(billId, id) {
+    const d = read(); id = Number(id);
+    d.expenses[billId] = (d.expenses[billId] ?? []).filter((e) => e.id !== id);
+    write(d); return { ok: true };
+  },
 
-  // ----- สรุปผล -----
-  async getSummary(billId) { return request(`/bills/${billId}/summary`); },
+  async getSummary(billId) {
+    const d = read();
+    const people = d.people[billId] ?? [];
+    const allIds = people.map((p) => p.id);
+    const expenses = (d.expenses[billId] ?? []).map((e) => ({
+      amount: e.amount,
+      payers: e.payers.map((p) => ({ personId: p.person_id, paid: p.paid })),
+      participants: e.allMembers ? allIds : e.participants.map((p) => p.person_id),
+    }));
+    const result = summarize(people, expenses);
+    const nameOf = Object.fromEntries(people.map((p) => [p.id, p.name]));
+    return {
+      totalSpent: result.totalSpent,
+      balances: Object.entries(result.balances).map(([id, net]) => ({ personId: Number(id), name: nameOf[id], net })),
+      transactions: result.transactions.map((t) => ({ from: nameOf[t.from], to: nameOf[t.to], amount: t.amount })),
+    };
+  },
 };

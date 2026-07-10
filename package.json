@@ -1,18 +1,12 @@
 {
   "name": "bill-splitter",
-  "version": "1.0.0",
-  "description": "เว็บหารค่าเหล้า/ค่าอาหาร — React + Node.js + PostgreSQL (Docker) + Auth",
+  "version": "2.0.0",
+  "description": "เว็บหารค่าเหล้า/ค่าอาหาร — React (Vite) เก็บข้อมูลใน localStorage ของเบราว์เซอร์ (ไม่มี server)",
   "private": true,
   "scripts": {
-    "install:all": "npm install --prefix server && npm install --prefix client",
-    "server": "npm start --prefix server",
-    "client": "npm run dev --prefix client",
-    "dev": "concurrently -n server,client -c blue,cyan \"npm run server\" \"npm run client\"",
-    "build": "npm install --prefix client && npm run build --prefix client && npm install --prefix server",
-    "start": "node server/index.js",
-    "test": "node server/test.js"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
+    "install:all": "npm install --prefix client",
+    "dev": "npm run dev --prefix client",
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "preview": "npm run preview --prefix client"
   }
 }

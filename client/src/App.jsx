@@ -1,47 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
-import Auth from './Auth';
 
 const baht = (n) => '฿' + Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function App() {
-  const [user, setUser] = useState(() => api.getUser());
   const [bills, setBills] = useState([]);
   const [currentBill, setCurrentBill] = useState(null);
   const loadBills = async () => setBills(await api.getBills());
-
-  // ออกจากระบบ (เคลียร์ทุกอย่างกลับหน้า login)
-  const signOut = () => { api.logout(); setUser(null); setCurrentBill(null); setBills([]); };
-
-  // token หมดอายุระหว่างใช้งาน -> เด้งกลับหน้า login อัตโนมัติ
-  useEffect(() => {
-    const onExpired = () => { setUser(null); setCurrentBill(null); setBills([]); };
-    window.addEventListener('auth-expired', onExpired);
-    return () => window.removeEventListener('auth-expired', onExpired);
-  }, []);
-
-  // โหลดบิลใหม่ทุกครั้งที่ล็อกอินสำเร็จ
-  useEffect(() => { if (user) loadBills(); }, [user]);
-
-  if (!user) {
-    return (
-      <div className="app">
-        <header className="hero">
-          <h1>🍻 หารค่าเหล้า / ค่าอาหาร</h1>
-          <p>หารเท่ากันทุกคน · คำนวณแม่นยำระดับสตางค์</p>
-        </header>
-        <Auth onAuthed={setUser} />
-      </div>
-    );
-  }
+  useEffect(() => { loadBills(); }, []);
 
   return (
     <div className="app">
       <header className="hero">
-        <div className="hero-bar">
-          <span className="user-badge">👤 {user.username}</span>
-          <button className="logout" onClick={signOut}>ออกจากระบบ</button>
-        </div>
         <h1>🍻 หารค่าเหล้า / ค่าอาหาร</h1>
         <p>หารเท่ากันทุกคน · คำนวณแม่นยำระดับสตางค์</p>
       </header>
