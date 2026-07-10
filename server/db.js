@@ -7,8 +7,13 @@ const connectionString =
   process.env.DATABASE_URL ||
   'postgres://billsplit:billsplit@localhost:5432/billsplit';
 
-// cloud Postgres ส่วนใหญ่บังคับ SSL; local docker ไม่ต้อง — ตั้ง PGSSL=require เพื่อเปิด
-const ssl = process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : false;
+// cloud Postgres (เช่น Render/Neon/Supabase) ส่วนใหญ่บังคับ SSL; local docker ไม่ต้อง
+// เปิด SSL อัตโนมัติเมื่อต่อกับ DB ที่ไม่ใช่ localhost — override ได้ด้วย PGSSL=require/disable
+const isLocal = /@(localhost|127\.0\.0\.1)\b/.test(connectionString);
+const ssl =
+  process.env.PGSSL === 'disable' ? false
+  : (process.env.PGSSL === 'require' || !isLocal) ? { rejectUnauthorized: false }
+  : false;
 
 const pool = new Pool({ connectionString, ssl });
 
