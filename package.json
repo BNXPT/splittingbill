@@ -1,7 +1,7 @@
 {
   "name": "bill-splitter",
   "version": "1.0.0",
-  "description": "เว็บหารค่าเหล้า/ค่าอาหาร — React + Node.js + SQLite (local)",
+  "description": "เว็บหารค่าเหล้า/ค่าอาหาร — React + Node.js + PostgreSQL (Docker) + Auth",
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
